@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>pasteX</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      background: #000000;
+      color: #ffffff;
+      font-family: monospace;
+      min-height: 100vh;
+    }
+    button, textarea {
+      font-family: monospace;
+      font-size: inherit;
+      background: #111111;
+      color: #ffffff;
+      border: 1px solid #333333;
+    }
+    a {
+      color: #ffffff;
+      text-decoration: underline;
+    }
+    input, textarea, button {
+      outline: none;
+    }
+    textarea:focus, button:focus {
+      border-color: #666666;
+    }
+  </style>
+</head>
+<body>
+
+<div id="app">
+  <!-- creation view -->
+  <div id="createView">
+    <h1>pasteX</h1>
+    <hr style="border-color: #333;">
+    <textarea id="pasteInput" rows="12" cols="80" style="width: 100%; max-width: 900px; border: 1px solid #333; padding: 12px; background: #0a0a0a; color: #ffffff; margin: 16px 0;" placeholder="paste text here..."></textarea>
+    <br>
+    <button id="createBtn" style="padding: 8px 20px; background: #1a1a1a; border: 1px solid #444; cursor: pointer;">create paste</button>
+    <button id="clearBtn" style="padding: 8px 20px; background: #1a1a1a; border: 1px solid #444; cursor: pointer; margin-left: 8px;">clear</button>
+    <div id="resultArea" style="display: none; margin-top: 24px;">
+      <hr style="border-color: #333;">
+      <div style="margin: 16px 0;">
+        <span id="pasteLink" style="word-break: break-all; color: #88aaff;"></span>
+      </div>
+      <button id="copyLinkBtn" style="padding: 6px 16px; background: #1a1a1a; border: 1px solid #444; cursor: pointer;">copy link</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function() {
+    const STORAGE_KEY = "pasteX_pastes";
+    
+    const pasteInput = document.getElementById("pasteInput");
+    const createBtn = document.getElementById("createBtn");
+    const clearBtn = document.getElementById("clearBtn");
+    const resultArea = document.getElementById("resultArea");
+    const pasteLinkSpan = document.getElementById("pasteLink");
+    const copyLinkBtn = document.getElementById("copyLinkBtn");
+    
+    // universal copy
+    function copyToClipboard(text, btnElement) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+          showFeedback(btnElement);
+        }).catch(() => {
+          fallbackCopy(text, btnElement);
+        });
+      } else {
+        fallbackCopy(text, btnElement);
+      }
+    }
+    
+    function fallbackCopy(text, btnElement) {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.style.position = "fixed";
+      textarea.style.top = "-9999px";
+      textarea.style.left = "-9999px";
+      document.body.appendChild(textarea);
+      textarea.select();
+      try {
+        const success = document.execCommand("copy");
+        if (success) {
+          showFeedback(btnElement);
+        } else {
+          alert("press and hold to copy: " + text);
+        }
+      } catch (err) {
+        alert("press and hold to copy: " + text);
+      }
+      document.body.removeChild(textarea);
+    }
+    
+    function showFeedback(btn) {
+      const original = btn.textContent;
+      btn.textContent = "copied!";
+      setTimeout(() => { btn.textContent = original; }, 1200);
+    }
+    
+    function getAllPastes() {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return {};
+      try {
+        return JSON.parse(raw);
+      } catch(e) {
+        return {};
+      }
+    }
+    
+    function saveAllPastes(pastes) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(pastes));
+    }
+    
+    function generateId() {
+      const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+      let id = '';
+      for (let i = 0; i < 8; i++) {
+        id += chars[Math.floor(Math.random() * chars.length)];
+      }
+      return id;
+    }
+    
+    function storePaste(content) {
+      if (!content.trim()) {
+        alert("cannot create empty paste");
+        return null;
+      }
+      const pastes = getAllPastes();
+      let id = generateId();
+      while (pastes[id]) {
+        id = generateId();
+      }
+      pastes[id] = {
+        content: content,
+        created: Date.now()
+      };
+      saveAllPastes(pastes);
+      return id;
+    }
+    
+    function getPaste(id) {
+      const pastes = getAllPastes();
+      return pastes[id] ? pastes[id].content : null;
+    }
+    
+    function buildLink(id) {
+      const { origin, pathname } = window.location;
+      return `${origin}${pathname}?id=${id}`;
+    }
+    
+    function showResult(id) {
+      const url = buildLink(id);
+      pasteLinkSpan.textContent = url;
+      resultArea.style.display = "block";
+      resultArea.scrollIntoView({ behavior: "smooth" });
+    }
+    
+    function handleCreate() {
+      const text = pasteInput.value;
+      if (!text.trim()) {
+        alert("cannot create empty paste");
+        return;
+      }
+      const id = storePaste(text);
+      if (id) {
+        showResult(id);
+        const original = createBtn.textContent;
+        createBtn.textContent = "created!";
+        setTimeout(() => { createBtn.textContent = original; }, 1000);
+      } else {
+        alert("failed to store");
+      }
+    }
+    
+    function handleClear() {
+      pasteInput.value = "";
+      pasteInput.focus();
+      resultArea.style.display = "none";
+    }
+    
+    function copyLink() {
+      const link = pasteLinkSpan.textContent;
+      if (!link || link === "#") {
+        alert("no link to copy");
+        return;
+      }
+      copyToClipboard(link, copyLinkBtn);
+    }
+    
+    // RAW VIEWER - no buttons, no bars, just the raw text
+    function handleRawViewer() {
+      const params = new URLSearchParams(window.location.search);
+      const id = params.get("id");
+      if (!id) return false;
+      
+      const content = getPaste(id);
+      if (content === null) {
+        // minimal not found
+        document.body.innerHTML = `
+          <div style="background:#000; color:#fff; font-family:monospace; padding:24px;">
+            <h1>pasteX</h1>
+            <hr style="border-color:#333;">
+            <p>not found</p>
+            <br>
+            <a href="./" style="color:#88aaff;">← back</a>
+          </div>
+        `;
+        return true;
+      }
+      
+      // RAW TEXT ONLY - no buttons, no bars, no UI elements
+      // just the raw content displayed as plain text
+      document.body.innerHTML = `<pre style="background:#000000; color:#ffffff; font-family:monospace; font-size:14px; line-height:1.5; margin:0; padding:20px; white-space:pre-wrap; word-break:break-word; border:0;">${escapeHtml(content)}</pre>`;
+      return true;
+    }
+    
+    function escapeHtml(str) {
+      return str
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+    
+    const isViewer = handleRawViewer();
+    
+    if (!isViewer) {
+      createBtn.addEventListener("click", handleCreate);
+      clearBtn.addEventListener("click", handleClear);
+      copyLinkBtn.addEventListener("click", copyLink);
+      resultArea.style.display = "none";
+    }
+  })();
+</script>
+</body>
+</html>
