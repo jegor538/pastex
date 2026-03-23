@@ -1,7 +1,8 @@
 // api/paste.js
 export default async function handler(req, res) {
-  const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
-  const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+  // YOUR UPSTASH CREDENTIALS (hardcoded for now)
+  const redisUrl = 'https://secure-bat-82381.upstash.io';
+  const redisToken = 'gQAAAAAAAUHNAAIncDExNzJkYTBmZWQwNDc0ZjY2ODliOTk5NjhkNzBjOTg5ZXAxODIzODE';
   
   // GET = retrieve paste
   if (req.method === 'GET') {
@@ -17,10 +18,9 @@ export default async function handler(req, res) {
       const data = await response.json();
       
       if (!data.result) {
-        return res.status(404).send('Paste not found or expired');
+        return res.status(404).send('Paste not found');
       }
       
-      // Remove quotes if present (Redis returns quoted string)
       let content = data.result;
       if (content.startsWith('"') && content.endsWith('"')) {
         content = content.slice(1, -1);
@@ -42,7 +42,6 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Empty content' });
     }
     
-    // Generate random 8-character ID
     const id = Math.random().toString(36).substring(2, 10);
     
     try {
@@ -62,6 +61,5 @@ export default async function handler(req, res) {
     }
   }
   
-  // Any other method
   res.status(405).json({ error: 'Method not allowed' });
 }
