@@ -5,56 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>pasteX</title>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-    body {
-      background: #000;
-      color: #fff;
-      font-family: monospace;
-      padding: 20px;
-      min-height: 100vh;
-    }
-    textarea, button {
-      font-family: monospace;
-      background: #111;
-      color: #fff;
-      border: 1px solid #333;
-      outline: none;
-    }
-    textarea {
-      width: 100%;
-      max-width: 800px;
-      padding: 12px;
-      margin: 16px 0;
-    }
-    button {
-      padding: 8px 20px;
-      cursor: pointer;
-      margin-right: 8px;
-    }
-    button:hover {
-      background: #222;
-    }
-    a {
-      color: #88f;
-    }
-    hr {
-      border-color: #333;
-      margin: 16px 0;
-    }
-    #link {
-      word-break: break-all;
-      color: #88f;
-    }
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{background:#000;color:#fff;font-family:monospace;padding:20px;}
+    textarea,button{font-family:monospace;background:#111;color:#fff;border:1px solid #333;}
+    textarea{width:100%;max-width:800px;padding:12px;margin:16px 0;}
+    button{padding:8px 20px;cursor:pointer;margin-right:8px;}
+    button:hover{background:#222;}
+    a{color:#88f;}
+    hr{border-color:#333;margin:16px 0;}
+    #link{word-break:break-all;color:#88f;}
   </style>
 </head>
 <body>
 <h1>pasteX</h1>
 <hr>
-<textarea id="txt" rows="10" cols="60" placeholder="paste text here..."></textarea>
+<textarea id="txt" rows="10" placeholder="paste text here..."></textarea>
 <br>
 <button id="create">create paste</button>
 <button id="clear">clear</button>
@@ -80,7 +45,7 @@
       return;
     }
     
-    const res = await fetch('/api/create', {
+    const res = await fetch('/api/paste', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({content})
@@ -88,13 +53,13 @@
     
     const data = await res.json();
     if (data.id) {
-      const url = location.origin + '/raw?id=' + data.id;
+      const url = location.origin + '/api/paste?id=' + data.id;
       linkSpan.innerText = url;
       resultDiv.style.display = 'block';
       createBtn.innerText = 'created!';
       setTimeout(() => createBtn.innerText = 'create paste', 1000);
     } else {
-      alert('error');
+      alert('error: ' + (data.error || 'unknown'));
     }
   };
   
