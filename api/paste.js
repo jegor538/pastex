@@ -1,47 +1,40 @@
 // api/paste.js
-import fs from 'fs';
-import path from 'path';
-
-const DATA_FILE = '/tmp/pastes.json';
-
-function readPastes() {
-  try {
-    if (fs.existsSync(DATA_FILE)) {
-      return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-    }
-  } catch(e) {}
-  return {};
-}
-
-function writePastes(pastes) {
-  fs.writeFileSync(DATA_FILE, JSON.stringify(pastes), 'utf8');
-}
-
-function generateId() {
-  return Math.random().toString(36).substring(2, 10);
-}
-
 export default async function handler(req, res) {
-  // GET request = retrieve paste
+  const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
+  const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+  
+  // GET = retrieve paste
   if (req.method === 'GET') {
     const { id } = req.query;
     if (!id) {
-      return res.status(400).send('Missing id parameter');
+      return res.status(400).send('Missing id');
     }
     
-    const pastes = readPastes();
-    const paste = pastes[id];
-    
-    if (!paste) {
-      return res.status(404).send('Paste not found');
+    try {
+      const response = await fetch(`${redisUrl}/get/${id}`, {
+        headers: { Authorization: `Bearer ${redisToken}` }
+      });
+      const data = await response.json();
+      
+      if (!data.result) {
+        return res.status(404).send('Paste not found or expired');
+      }
+      
+      // Remove quotes if present (Redis returns quoted string)
+      let content = data.result;
+      if (content.startsWith('"') && content.endsWith('"')) {
+        content = content.slice(1, -1);
+      }
+      
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      return res.send(content);
+    } catch (err) {
+      console.error(err);
+      return res.status(500).send('Server error');
     }
-    
-    // Return RAW TEXT (no HTML)
-    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-    return res.send(paste.content);
   }
   
-  // POST request = create paste
+  // POST = create paste
   if (req.method === 'POST') {
     const { content } = req.body;
     
@@ -49,19 +42,24 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Empty content' });
     }
     
-    const pastes = readPastes();
-    let id = generateId();
-    while (pastes[id]) {
-      id = generateId();
+    // Generate random 8-character ID
+    const id = Math.random().toString(36).substring(2, 10);
+    
+    try {
+      await fetch(`${redisUrl}/set/${id}`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${redisToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(content)
+      });
+      
+      return res.json({ id });
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ error: 'Failed to save paste' });
     }
-    
-    pastes[id] = {
-      content: content,
-      created: Date.now()
-    };
-    
-    writePastes(pastes);
-    return res.json({ id });
   }
   
   // Any other method
