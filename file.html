@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>pasteX</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      background: white;
+      font-family: monospace;
+      margin: 20px;
+      line-height: 1.4;
+    }
+    button, textarea {
+      font-family: monospace;
+      font-size: inherit;
+    }
+    a {
+      color: #0000ee;
+    }
+    #copyLinkBtn, #copyRawLink {
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+<h1>pasteX</h1>
+<hr>
+
+<textarea id="pasteInput" rows="12" cols="80" style="width: 100%; max-width: 800px; border: 1px solid #999; padding: 8px; font-family: monospace;"></textarea>
+<br><br>
+
+<button id="createBtn">create paste</button>
+<button id="clearBtn">clear</button>
+
+<br><br>
+<div id="resultArea" style="display: none;">
+  <hr>
+  <a href="#" id="pasteLink" target="_blank" style="word-break: break-all;"></a>
+  <br><br>
+  <button id="copyLinkBtn">copy link</button>
+</div>
+
+<script>
+  (function() {
+    const STORAGE_KEY = "pasteX_pastes";
+    
+    const pasteInput = document.getElementById("pasteInput");
+    const createBtn = document.getElementById("createBtn");
+    const clearBtn = document.getElementById("clearBtn");
+    const resultArea = document.getElementById("resultArea");
+    const pasteLink = document.getElementById("pasteLink");
+    const copyLinkBtn = document.getElementById("copyLinkBtn");
+    
+    // universal copy function that works on mobile
+    function copyToClipboard(text, buttonElement) {
+      // Method 1: modern clipboard API
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+          showCopiedFeedback(buttonElement);
+        }).catch(() => {
+          fallbackCopy(text, buttonElement);
+        });
+      } else {
+        fallbackCopy(text, buttonElement);
+      }
+    }
+    
+    // fallback for older browsers / mobile
+    function fallbackCopy(text, buttonElement) {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.style.position = "fixed";
+      textarea.style.top = "-9999px";
+      textarea.style.left = "-9999px";
+      document.body.appendChild(textarea);
+      textarea.select();
+      textarea.setSelectionRange(0, text.length);
+      
+      try {
+        const success = document.execCommand("copy");
+        if (success) {
+          showCopiedFeedback(buttonElement);
+        } else {
+          alert("press and hold the link to copy: " + text);
+        }
+      } catch (err) {
+        alert("press and hold the link to copy: " + text);
+      }
+      
+      document.body.removeChild(textarea);
+    }
+    
+    function showCopiedFeedback(button) {
+      const original = button.textContent;
+      button.textContent = "copied!";
+      setTimeout(() => { button.textContent = original; }, 1500);
+    }
+    
+    function getAllPastes() {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return {};
+      try {
+        return JSON.parse(raw);
+      } catch(e) {
+        return {};
+      }
+    }
+    
+    function saveAllPastes(pastes) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(pastes));
+    }
+    
+    function generateId() {
+      const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+      let id = '';
+      for (let i = 0; i < 8; i++) {
+        id += chars[Math.floor(Math.random() * chars.length)];
+      }
+      return id;
+    }
+    
+    function storePaste(content) {
+      if (!content.trim()) {
+        alert("cannot create empty paste");
+        return null;
+      }
+      const pastes = getAllPastes();
+      let id = generateId();
+      while (pastes[id]) {
+        id = generateId();
+      }
+      pastes[id] = {
+        content: content,
+        created: Date.now()
+      };
+      saveAllPastes(pastes);
+      return id;
+    }
+    
+    function getPaste(id) {
+      const pastes = getAllPastes();
+      return pastes[id] ? pastes[id].content : null;
+    }
+    
+    function buildLink(id) {
+      const { origin, pathname } = window.location;
+      return `${origin}${pathname}?id=${id}`;
+    }
+    
+    function showResult(id) {
+      const url = buildLink(id);
+      pasteLink.href = url;
+      pasteLink.textContent = url;
+      resultArea.style.display = "block";
+      resultArea.scrollIntoView({ behavior: "smooth" });
+    }
+    
+    function handleCreate() {
+      const text = pasteInput.value;
+      if (!text.trim()) {
+        alert("cannot create empty paste");
+        return;
+      }
+      const id = storePaste(text);
+      if (id) {
+        showResult(id);
+        const original = createBtn.textContent;
+        createBtn.textContent = "created!";
+        setTimeout(() => { createBtn.textContent = original; }, 1000);
+      } else {
+        alert("failed to store");
+      }
+    }
+    
+    function handleClear() {
+      pasteInput.value = "";
+      pasteInput.focus();
+      resultArea.style.display = "none";
+    }
+    
+    function copyLink() {
+      const link = pasteLink.getAttribute("href");
+      if (!link || link === "#") {
+        alert("no link to copy");
+        return;
+      }
+      copyToClipboard(link, copyLinkBtn);
+    }
+    
+    function handleViewer() {
+      const params = new URLSearchParams(window.location.search);
+      const id = params.get("id");
+      if (!id) return false;
+      
+      const content = getPaste(id);
+      if (content === null) {
+        document.body.innerHTML = `
+          <h1>pasteX</h1>
+          <hr>
+          <h2>not found</h2>
+          <br>
+          <a href="./">← back</a>
+        `;
+        return true;
+      }
+      
+      document.body.innerHTML = `
+        <h1>pasteX</h1>
+        <hr>
+        <pre style="background: #f8f8f8; border: 1px solid #ccc; padding: 16px; overflow-x: auto; white-space: pre-wrap; font-family: monospace; font-size: 14px; margin: 20px 0;">${escapeHtml(content)}</pre>
+        <hr>
+        <a href="./">new paste</a> · <button id="copyRawLink">copy link</button>
+      `;
+      
+      const copyRawBtn = document.getElementById("copyRawLink");
+      if (copyRawBtn) {
+        copyRawBtn.addEventListener("click", () => {
+          copyToClipboard(window.location.href, copyRawBtn);
+        });
+      }
+      return true;
+    }
+    
+    function escapeHtml(str) {
+      return str
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+    
+    const isViewer = handleViewer();
+    
+    if (!isViewer) {
+      createBtn.addEventListener("click", handleCreate);
+      clearBtn.addEventListener("click", handleClear);
+      copyLinkBtn.addEventListener("click", copyLink);
+      resultArea.style.display = "none";
+    }
+  })();
+</script>
+</body>
+</html>
