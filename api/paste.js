@@ -9,29 +9,18 @@ export default async function handler(req, res) {
     if (!id) return res.status(400).send('Missing id');
     
     try {
-      // Get paste data
       const response = await fetch(`${redisUrl}/get/${id}`, {
         headers: { Authorization: `Bearer ${redisToken}` }
       });
       const data = await response.json();
       
-      if (!data.result) return res.status(404).send('Paste not found');
+      if (!data.result) return res.status(404).send('Not found');
       
       let paste = data.result;
       if (paste.startsWith('"') && paste.endsWith('"')) {
         paste = JSON.parse(paste);
       } else {
         paste = JSON.parse(paste);
-      }
-      
-      // Check expiration
-      if (paste.expiresAt && paste.expiresAt < Date.now()) {
-        // Delete expired paste
-        await fetch(`${redisUrl}/del/${id}`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${redisToken}` }
-        });
-        return res.status(410).send('Paste expired');
       }
       
       // Check password
@@ -51,7 +40,7 @@ export default async function handler(req, res) {
   
   // POST = create paste
   if (req.method === 'POST') {
-    const { content, password, expiresAt } = req.body;
+    const { content, password } = req.body;
     if (!content || !content.trim()) {
       return res.status(400).json({ error: 'Empty' });
     }
@@ -65,10 +54,6 @@ export default async function handler(req, res) {
     
     if (password && password.trim()) {
       pasteData.password = password.trim();
-    }
-    
-    if (expiresAt) {
-      pasteData.expiresAt = expiresAt;
     }
     
     try {
