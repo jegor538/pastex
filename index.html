@@ -16,7 +16,7 @@
       font-family: monospace;
       padding: 24px;
     }
-    textarea, button {
+    textarea, input, button {
       font-family: monospace;
       background: #111;
       color: #fff;
@@ -30,6 +30,11 @@
       margin: 16px 0;
       resize: none;
     }
+    input {
+      padding: 8px 12px;
+      margin-right: 8px;
+      width: 120px;
+    }
     button {
       padding: 8px 20px;
       cursor: pointer;
@@ -38,8 +43,28 @@
     button:hover {
       background: #222;
     }
+    .option-group {
+      margin: 16px 0;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+    }
+    .expiry-group {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+    .expiry-group input {
+      width: 70px;
+    }
     #link {
       word-break: break-all;
+    }
+    hr {
+      border-color: #333;
+      margin: 16px 0;
     }
   </style>
 </head>
@@ -48,7 +73,21 @@
 <h1>pasteX</h1>
 
 <textarea id="txt" rows="10" placeholder="paste text here"></textarea>
-<br>
+
+<div class="option-group">
+  <input type="password" id="password" placeholder="password (optional)">
+  
+  <div class="expiry-group">
+    <input type="number" id="hours" placeholder="hours" min="0" value="0" style="width:70px">
+    <span>h</span>
+    <input type="number" id="minutes" placeholder="minutes" min="0" value="0" style="width:70px">
+    <span>m</span>
+    <input type="number" id="seconds" placeholder="seconds" min="0" value="0" style="width:70px">
+    <span>s</span>
+    <span style="color:#888">(0 = never expires)</span>
+  </div>
+</div>
+
 <button id="create">create paste</button>
 <button id="clear">clear</button>
 
@@ -60,6 +99,10 @@
 
 <script>
   const txt = document.getElementById('txt');
+  const passwordInput = document.getElementById('password');
+  const hoursInput = document.getElementById('hours');
+  const minutesInput = document.getElementById('minutes');
+  const secondsInput = document.getElementById('seconds');
   const createBtn = document.getElementById('create');
   const clearBtn = document.getElementById('clear');
   const resultDiv = document.getElementById('result');
@@ -73,26 +116,48 @@
       return;
     }
     
+    const password = passwordInput.value.trim();
+    const hours = parseInt(hoursInput.value) || 0;
+    const minutes = parseInt(minutesInput.value) || 0;
+    const seconds = parseInt(secondsInput.value) || 0;
+    
+    let expiresAt = null;
+    if (hours > 0 || minutes > 0 || seconds > 0) {
+      const totalSeconds = (hours * 3600) + (minutes * 60) + seconds;
+      expiresAt = Date.now() + (totalSeconds * 1000);
+    }
+    
     const res = await fetch('/api/paste', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({content})
+      body: JSON.stringify({
+        content,
+        password: password || null,
+        expiresAt
+      })
     });
     
     const data = await res.json();
     if (data.id) {
-      const url = location.origin + '/api/paste?id=' + data.id;
+      let url = location.origin + '/api/paste?id=' + data.id;
+      if (password) {
+        url += '&p=' + encodeURIComponent(password);
+      }
       linkSpan.innerText = url;
       resultDiv.style.display = 'block';
       createBtn.innerText = 'created';
       setTimeout(() => createBtn.innerText = 'create paste', 1000);
     } else {
-      alert('error');
+      alert('error: ' + (data.error || 'unknown'));
     }
   };
   
   clearBtn.onclick = () => {
     txt.value = '';
+    passwordInput.value = '';
+    hoursInput.value = '0';
+    minutesInput.value = '0';
+    secondsInput.value = '0';
     resultDiv.style.display = 'none';
   };
   
