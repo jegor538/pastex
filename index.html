@@ -5,54 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>pasteX</title>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-    body {
-      background: #000;
-      color: #fff;
-      font-family: monospace;
-      padding: 24px;
-    }
-    textarea, input, button {
-      font-family: monospace;
-      background: #111;
-      color: #fff;
-      border: none;
-      outline: none;
-    }
-    textarea {
-      width: 100%;
-      max-width: 800px;
-      padding: 12px;
-      margin: 16px 0;
-      resize: none;
-    }
-    input {
-      padding: 8px 12px;
-      margin-right: 8px;
-      width: 200px;
-    }
-    button {
-      padding: 8px 20px;
-      cursor: pointer;
-      margin-right: 8px;
-    }
-    button:hover {
-      background: #222;
-    }
-    .option-group {
-      margin: 16px 0;
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 12px;
-    }
-    #link {
-      word-break: break-all;
-    }
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{background:#000;color:#fff;font-family:monospace;padding:24px;}
+    textarea,button{font-family:monospace;background:#111;color:#fff;border:none;outline:none;}
+    textarea{width:100%;max-width:800px;padding:12px;margin:16px 0;resize:none;}
+    button{padding:8px 20px;cursor:pointer;margin-right:8px;}
+    button:hover{background:#222;}
+    #link{word-break:break-all;}
   </style>
 </head>
 <body>
@@ -60,11 +19,7 @@
 <h1>pasteX</h1>
 
 <textarea id="txt" rows="10" placeholder="paste text here"></textarea>
-
-<div class="option-group">
-  <input type="password" id="password" placeholder="password (optional)">
-</div>
-
+<br>
 <button id="create">create paste</button>
 <button id="clear">clear</button>
 
@@ -76,7 +31,6 @@
 
 <script>
   const txt = document.getElementById('txt');
-  const passwordInput = document.getElementById('password');
   const createBtn = document.getElementById('create');
   const clearBtn = document.getElementById('clear');
   const resultDiv = document.getElementById('result');
@@ -90,35 +44,26 @@
       return;
     }
     
-    const password = passwordInput.value.trim();
-    
     const res = await fetch('/api/paste', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        content,
-        password: password || null
-      })
+      body: JSON.stringify({content})
     });
     
     const data = await res.json();
     if (data.id) {
-      let url = location.origin + '/api/paste?id=' + data.id;
-      if (password) {
-        url += '&p=' + encodeURIComponent(password);
-      }
+      const url = location.origin + '/api/paste?id=' + data.id;
       linkSpan.innerText = url;
       resultDiv.style.display = 'block';
       createBtn.innerText = 'created';
       setTimeout(() => createBtn.innerText = 'create paste', 1000);
     } else {
-      alert('error: ' + (data.error || 'unknown'));
+      alert('error');
     }
   };
   
   clearBtn.onclick = () => {
     txt.value = '';
-    passwordInput.value = '';
     resultDiv.style.display = 'none';
   };
   
